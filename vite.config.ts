@@ -1,4 +1,4 @@
 import { defineConfig } from 'vite'
-import vinext from 'vinext'
+import react from '@vitejs/plugin-react'
 
-export default defineConfig({ plugins: [vinext()] })
+export default defineConfig({ plugins: [react()] })
