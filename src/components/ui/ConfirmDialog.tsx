@@ -1,0 +1,10 @@
+import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
+
+export function ConfirmDialog({open,title,description,impact,confirmLabel='تأكيد الإجراء',danger=false,onConfirm,onClose}:{open:boolean;title:string;description:string;impact?:string;confirmLabel?:string;danger?:boolean;onConfirm:()=>void;onClose:()=>void}){
+  const card=useRef<HTMLDivElement>(null),closeButton=useRef<HTMLButtonElement>(null),previous=useRef<HTMLElement|null>(null)
+  useEffect(()=>{if(!open)return;previous.current=document.activeElement as HTMLElement;closeButton.current?.focus();const key=(event:KeyboardEvent)=>{if(event.key==='Escape')onClose();if(event.key==='Tab'&&card.current){const nodes=[...card.current.querySelectorAll<HTMLElement>('button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')].filter(node=>!node.hasAttribute('disabled'));if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}};document.addEventListener('keydown',key);return()=>{document.removeEventListener('keydown',key);previous.current?.focus()}},[open,onClose])
+  if(!open)return null
+  return <div className="dialog-backdrop" role="presentation" onMouseDown={event=>{if(event.currentTarget===event.target)onClose()}}><div ref={card} className="dialog-card" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description"><button ref={closeButton} className="icon-button dialog-close" aria-label="إغلاق نافذة التأكيد" onClick={onClose}><X/></button><h2 id="confirm-title">{title}</h2><p id="confirm-description">{description}</p>{impact&&<p className="dialog-impact"><strong>أثر الإجراء:</strong> {impact}</p>}<div className="form-actions"><button className="button secondary" onClick={onClose}>إلغاء</button><button className={`button ${danger?'danger':'primary'}`} onClick={()=>{onConfirm();onClose()}}>{confirmLabel}</button></div></div></div>
+}
+

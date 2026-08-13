@@ -1,7 +1,8 @@
 import type { Permission, Role } from './types'
 
 export const rolePermissions: Record<Role, Permission[]> = {
-  'مدير التشغيل': ['student.view','student.create','student.update','group.view','group.assign','teacher.view','teacher.create','teacher.update','teacher.assign','teacher.schedule','schedule.view','schedule.edit','attendance.view','attendance.record','payment.view','payment.create','payment.approve','followup.view','followup.create','report.view','report.export','summary.view','audit.view','permission.view','notification.view','settings.academy'],
+  'المدير العام': ['student.view','group.view','teacher.view','schedule.view','attendance.view','payment.view','followup.view','report.view','report.export','summary.view','audit.view','permission.view','notification.view','settings.academy','executive.view','risk.view','decision.view','decision.approve','ledger.view'],
+  'مدير التشغيل': ['student.view','student.create','student.update','group.view','group.assign','teacher.view','teacher.create','teacher.update','teacher.assign','teacher.schedule','schedule.view','schedule.edit','attendance.view','attendance.record','payment.view','payment.create','payment.approve','followup.view','followup.create','report.view','report.export','audit.view','notification.view','settings.academy'],
   'موظف المتابعة': ['student.view','attendance.view','followup.view','followup.create','notification.view'],
   'المدرس': ['student.view','group.view','schedule.view','attendance.view','attendance.record','notification.view'],
   'المحاسب': ['student.view','payment.view','payment.create','payment.approve','notification.view'],
@@ -16,6 +17,7 @@ export const permissionLabels: Record<Permission, string> = {
   'followup.view':'عرض المتابعات','followup.create':'تسجيل متابعة','report.view':'عرض التقارير',
   'report.export':'تصدير التقارير','summary.view':'عرض ملخص النظام','audit.view':'عرض سجل التدقيق','permission.view':'عرض الصلاحيات',
   'notification.view':'عرض الإشعارات','settings.academy':'تعديل إعدادات الأكاديمية',
+  'executive.view':'عرض لوحة المدير العام','risk.view':'عرض المخاطر والاستثناءات','decision.view':'عرض القرارات التنفيذية','decision.approve':'اعتماد القرارات التنفيذية','ledger.view':'عرض دفتر الحركات المالية',
 }
 
 export const can = (role: Role, permission: Permission) => rolePermissions[role].includes(permission)

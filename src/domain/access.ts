@@ -41,6 +41,7 @@ export const canAccessSession = (context: AccessContext, id?: string) =>
 
 export const visibleNotifications = (context: AccessContext, notifications: Notification[]) => notifications.filter(item => {
   if (context.role === 'مدير التشغيل') return true
+  if (context.role === 'المدير العام') return Boolean(item.audience?.includes('المدير العام') || item.priority === 'حرجة' || ['/risks','/decisions','/ledger','/system-summary'].some(prefix => item.route.startsWith(prefix)))
   if (context.role === 'المحاسب') return item.route.startsWith('/payments') || item.route.startsWith('/students/')
   if (context.role === 'موظف المتابعة') return ['/overdue','/messages','/attendance','/students'].some(prefix => item.route.startsWith(prefix))
   const studentId = item.route.match(/^\/students\/([^/?]+)/)?.[1]

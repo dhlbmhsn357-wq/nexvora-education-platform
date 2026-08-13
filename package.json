@@ -8,10 +8,14 @@
     "build": "vinext build && node scripts/copy-hosting.mjs",
     "build:vercel": "tsc -b && vite build --config vite.vercel.config.ts",
     "preview": "vinext start",
-    "test:acceptance": "node scripts/acceptance-business.mjs"
+    "test:acceptance": "node scripts/acceptance-business.mjs",
+    "test:ui": "node scripts/ui-contracts.mjs",
+    "test": "pnpm test:ui && pnpm test:acceptance"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",

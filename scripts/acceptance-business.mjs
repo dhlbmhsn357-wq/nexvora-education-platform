@@ -19,6 +19,7 @@ try {
   const { buildReport, getOperationalAlerts } = await server.ssrLoadModule('/src/reporting/selectors.ts')
   const { visibleGroups, visibleSessions, visibleStudents } = await server.ssrLoadModule('/src/domain/access.ts')
   const { can } = await server.ssrLoadModule('/src/domain/permissions.ts')
+  const { buildExecutiveSnapshot, ledgerConsistency } = await server.ssrLoadModule('/src/reporting/executive.ts')
   const results = []
   const check = (name, condition) => { assert.ok(condition, name); results.push({ name, status: 'PASS' }) }
 
@@ -80,7 +81,7 @@ try {
   result = useAppStore.getState().updateTeacher('t1', { name: 'أحمد مصطفى المعدل' })
   check('teacher rename updates groups and sessions consistently', result.ok && useAppStore.getState().groups.some(group => group.instructor === 'أحمد مصطفى المعدل') && useAppStore.getState().sessions.some(session => session.instructor === 'أحمد مصطفى المعدل'))
   const report = buildReport(useAppStore.getState(), { from: '2026-08-01', to: '2026-08-31', label: 'أغسطس' })
-  check('report counts only approved payments as collected', report.paymentMetrics.collected === 0 && report.paymentMetrics.pending === 2)
+  check('report counts only approved payments as collected', report.paymentMetrics.collected === 600 && report.paymentMetrics.pending === 2 && report.paymentMetrics.approved === 2)
 
   useAppStore.getState().reset()
   useAppStore.getState().login('المدرس', 't3')
@@ -92,13 +93,53 @@ try {
   check('teacher sees only students in own groups', visibleStudents(teacherContext).every(item => item.group === 'المستوى الأول A') && !visibleStudents(teacherContext).some(item => item.id === 's1'))
   result = useAppStore.getState().saveAttendance('x1', [])
   check('teacher cannot record attendance for another teacher session', !result.ok && result.code === 'permission_denied')
-  check('system summary is manager only', can('مدير التشغيل', 'summary.view') && !can('المدرس', 'summary.view') && !can('موظف المتابعة', 'summary.view') && !can('المحاسب', 'summary.view'))
+  check('system summary is CEO only', can('المدير العام', 'summary.view') && !can('مدير التشغيل', 'summary.view') && !can('المدرس', 'summary.view') && !can('موظف المتابعة', 'summary.view') && !can('المحاسب', 'summary.view'))
   check('non-manager roles cannot elevate permissions from their role matrix', !can('المدرس', 'permission.view') && !can('موظف المتابعة', 'audit.view') && !can('المحاسب', 'teacher.view'))
   const activeTeacherIds = useAppStore.getState().teachers.filter(item => item.status === 'نشط').map(item => item.id)
   check('all active teachers are available as distinct accounts', activeTeacherIds.length === 5 && new Set(activeTeacherIds).size === 5)
   const academyBefore = useAppStore.getState().settings.academyName
   useAppStore.getState().saveSettings({ ...useAppStore.getState().settings, academyName: 'تغيير غير مسموح', theme: 'dark' })
   check('non-manager cannot change academy identity through store action', useAppStore.getState().settings.academyName === academyBefore && useAppStore.getState().settings.theme === 'dark')
+
+  useAppStore.getState().reset()
+  result = useAppStore.getState().addGroup({ name: 'المستوى المتقدم C', course: 'اللغة العربية', instructor: 'أحمد مصطفى', room: 'قاعة 4', capacity: 12, schedule: 'السبت والأربعاء · 7:00 م' })
+  check('manager can create a locally persisted group', result.ok && useAppStore.getState().groups.some(group => group.id === result.value.id && group.enrolled === 0))
+  const createdGroupId = result.ok ? result.value.id : ''
+  result = useAppStore.getState().addGroup({ name: 'المستوى المتقدم C', course: 'اللغة العربية', instructor: 'أحمد مصطفى', room: 'قاعة 5', capacity: 10, schedule: 'الأحد · 6:00 م' })
+  check('duplicate group name is blocked', !result.ok && result.code === 'duplicate_group')
+  result = useAppStore.getState().archiveStudent('s1', true)
+  check('student archive is explicit and reversible', result.ok && useAppStore.getState().students.find(student => student.id === 's1')?.status === 'مؤرشف')
+  result = useAppStore.getState().archiveStudent('s1', false)
+  check('student restore returns file to active state', result.ok && useAppStore.getState().students.find(student => student.id === 's1')?.status === 'نشط')
+  result = useAppStore.getState().deleteGroup('g1')
+  check('linked group cannot be permanently deleted', !result.ok && result.code === 'linked_records')
+  result = useAppStore.getState().deleteTeacher('t1')
+  check('linked teacher cannot be permanently deleted', !result.ok && result.code === 'linked_records')
+  result = useAppStore.getState().deleteGroup(createdGroupId)
+  check('empty unlinked group can be permanently deleted', result.ok && !useAppStore.getState().groups.some(group => group.id === createdGroupId))
+
+  useAppStore.getState().reset()
+  useAppStore.getState().login('المدير العام', 'u-ceo')
+  check('CEO has executive read and decision permissions without operational CRUD', can('المدير العام','executive.view') && can('المدير العام','decision.approve') && can('المدير العام','ledger.view') && !can('المدير العام','student.create') && !can('المدير العام','attendance.record'))
+  const executive = buildExecutiveSnapshot(useAppStore.getState(), { from: '2026-08-01', to: '2026-08-31', label: 'أغسطس' })
+  check('executive snapshot is limited to eight decision KPIs', executive.kpis.length === 8 && executive.kpis.every(item => item.previous !== undefined && item.route))
+  check('executive snapshot exposes risks and pending decisions', executive.risks.length > 0 && executive.decisions.some(item => item.status === 'بانتظار الاعتماد'))
+  check('financial ledger reconciles with student balances', ledgerConsistency(useAppStore.getState().students,useAppStore.getState().ledger,useAppStore.getState().payments).length === 0)
+  result = useAppStore.getState().addStudent({ name: 'غير مسموح للمدير العام', phone: '01595550001', guardian: '', group: '', course: 'اللغة العربية', packageName: 'شهرية', paid: 0, total: 1200, due: 'بانتظار السداد' })
+  check('CEO cannot perform daily student creation', !result.ok && result.code === 'permission_denied')
+
+  useAppStore.getState().reset()
+  useAppStore.getState().login('المحاسب','u-accountant-entry')
+  result = useAppStore.getState().reviewPayment('REV-2026-014','approve','تمت المطابقة')
+  check('payment entry accountant cannot approve', !result.ok && result.code === 'permission_denied')
+  useAppStore.getState().login('المحاسب','u-accountant-review')
+  const balanceBeforeReview = useAppStore.getState().students.find(item=>item.id==='s1')?.paid
+  result = useAppStore.getState().reviewPayment('REV-2026-014','approve','تمت مطابقة الإثبات والمرجع')
+  check('distinct financial reviewer can approve once', result.ok && useAppStore.getState().students.find(item=>item.id==='s1')?.paid === balanceBeforeReview + 500)
+  const ledgerAfterReview = useAppStore.getState().ledger.length
+  result = useAppStore.getState().reviewPayment('REV-2026-014','approve','محاولة تكرار')
+  check('approved payment cannot be applied twice', !result.ok && useAppStore.getState().ledger.length === ledgerAfterReview)
+  check('approval audit records named actor and critical sensitivity', useAppStore.getState().audit.some(item=>item.entityId==='REV-2026-014' && item.userName==='كريم فؤاد' && item.sensitivity==='حرجة'))
 
   console.log(JSON.stringify({ status: 'PASS', tests: results.length, results }, null, 2))
 } finally {
